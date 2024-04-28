@@ -12,20 +12,30 @@ const MSEC_PER_SEC: usize = 1000;
 #[allow(dead_code)]
 const MICRO_PER_SEC: usize = 1_000_000;
 
+/// gettime syscall
+#[allow(dead_code)]
+const SYSCALL_GET_TIME: usize = 169;
+
 /// Get the current time in ticks
 pub fn get_time() -> usize {
+    // use crate::task::TASK_MANAGER;
+    // TASK_MANAGER.increase_syscall_time(SYSCALL_GET_TIME);
+    //println!("{}", crate::task::TASK_MANAGER.get_syscall_times()[SYSCALL_GET_TIME]);
+    crate::task::TASK_MANAGER.increase_syscall_time(SYSCALL_GET_TIME);
     time::read()
 }
 
 /// get current time in milliseconds
 #[allow(dead_code)]
 pub fn get_time_ms() -> usize {
+    //crate::task::TASK_MANAGER.increase_syscall_time(SYSCALL_GET_TIME);
     time::read() * MSEC_PER_SEC / CLOCK_FREQ
 }
 
 /// get current time in microseconds
 #[allow(dead_code)]
 pub fn get_time_us() -> usize {
+    //crate::task::TASK_MANAGER.increase_syscall_time(SYSCALL_GET_TIME);
     time::read() * MICRO_PER_SEC / CLOCK_FREQ
 }
 
