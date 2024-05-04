@@ -47,6 +47,15 @@ impl MemorySet {
             areas: Vec::new(),
         }
     }
+    /// translate user address to physical address
+    pub fn translate_useraddr_to_physaddr(&self, ptr: *const u8) -> usize {
+        let token = self.token();
+        let page_table = PageTable::from_token(token);
+        let va = VirtAddr::from(ptr as usize);
+        let ppn = page_table.translate(va.floor()).unwrap().ppn();
+        PhysAddr::from(ppn).0 + va.page_offset()
+    }
+
     /// Get the page table token
     pub fn token(&self) -> usize {
         self.page_table.token()

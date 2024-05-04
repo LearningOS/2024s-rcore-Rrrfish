@@ -92,8 +92,15 @@ impl TaskManager {
         panic!("unreachable in run_first_task!");
     }
 
-     /// get the time interval since the task was first invoked
-     pub fn get_task_time(&self) -> usize {
+    /// translate user address to physical address in current task
+    pub fn translate_useraddr(&self, ptr: *const u8) -> usize {
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].memory_set.translate_useraddr_to_physaddr(ptr)
+    }
+
+    /// get the time interval since the task was first invoked
+    pub fn get_task_time(&self) -> usize {
         let inner = self.inner.exclusive_access();
         let current = inner.current_task;
         let time = inner.tasks[current].start_time;

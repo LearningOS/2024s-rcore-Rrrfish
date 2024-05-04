@@ -2,8 +2,9 @@
 use crate::{
     config::MAX_SYSCALL_NUM,
     task::{
-        change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus,
+        change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus, TASK_MANAGER,
     },
+    timer::get_time_us,
 };
 
 #[repr(C)]
@@ -43,15 +44,33 @@ pub fn sys_yield() -> isize {
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
 pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
     trace!("kernel: sys_get_time");
-    -1
+    let us = get_time_us();
+    let ts = TASK_MANAGER.translate_useraddr(_ts as *const u8) as *mut TimeVal;
+    unsafe {
+        *ts = TimeVal {
+            sec: us / 1_000_000,
+            usec: us % 1_000_000,
+        };
+    }
+    0
 }
 
 /// YOUR JOB: Finish sys_task_info to pass testcases
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
 pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
-    trace!("kernel: sys_task_info NOT IMPLEMENTED YET!");
-    -1
+    trace!("kernel: sys_task_info");
+    //TASK_MANAGER.increase_syscall_time(SYSCALL_TASK_INFO);
+    let time = TASK_MANAGER.get_task_time();
+    let syscall_times = TASK_MANAGER.get_syscall_times();
+    let status = TaskStatus::Running;
+    let ti = TASK_MANAGER.translate_useraddr(_ti as *const u8) as *mut TaskInfo;
+    unsafe {*ti = TaskInfo {
+        time,
+        syscall_times,
+        status,
+    };}
+    0
 }
 
 // YOUR JOB: Implement mmap.
