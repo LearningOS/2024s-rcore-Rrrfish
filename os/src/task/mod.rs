@@ -17,9 +17,12 @@ mod task;
 use crate::loader::{get_app_data, get_num_app};
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
+use crate::config::MAX_SYSCALL_NUM;
+use crate::timer::get_time_ms;
 use alloc::vec::Vec;
 use lazy_static::*;
 use switch::__switch;
+
 pub use task::{TaskControlBlock, TaskStatus};
 
 pub use context::TaskContext;
@@ -89,6 +92,32 @@ impl TaskManager {
         panic!("unreachable in run_first_task!");
     }
 
+     /// get the time interval since the task was first invoked
+     pub fn get_task_time(&self) -> usize {
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let time = inner.tasks[current].start_time;
+        //drop(inner);
+        get_time_ms() - time
+    }
+
+    /// get the task of syscall times
+    pub fn get_syscall_times(&self) -> [u32; MAX_SYSCALL_NUM] {
+
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].syscall_times
+    }
+
+    /// increase the syscall time of current task
+    pub fn increase_syscall_time(&self, id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].syscall_times[id] += 1;
+        //println!("id: {}, times: {}", id, syscall[id]);
+    }
+
+
     /// Change the status of current `Running` task into `Ready`.
     fn mark_current_suspended(&self) {
         let mut inner = self.inner.exclusive_access();
@@ -141,6 +170,10 @@ impl TaskManager {
             let current = inner.current_task;
             inner.tasks[next].task_status = TaskStatus::Running;
             inner.current_task = next;
+            let time_ms_now = get_time_ms();
+            if inner.tasks[next].start_time == 0 {
+                inner.tasks[next].start_time = time_ms_now;
+            }
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
             let next_task_cx_ptr = &inner.tasks[next].task_cx as *const TaskContext;
             drop(inner);
