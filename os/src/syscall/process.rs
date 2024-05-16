@@ -122,7 +122,15 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
         "kernel:pid[{}] sys_get_time NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    let us = get_time_us();
+    let ts = TASK_MANAGER.translate_useraddr(_ts as *const u8) as *mut TimeVal;
+    unsafe {
+        *ts = TimeVal {
+            sec: us / 1_000_000,
+            usec: us % 1_000_000,
+        };
+    }
+    0
 }
 
 /// YOUR JOB: Finish sys_task_info to pass testcases
@@ -130,10 +138,19 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
 pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
     trace!(
-        "kernel:pid[{}] sys_task_info NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_task_info",
         current_task().unwrap().pid.0
     );
-    -1
+    let time = TASK_MANAGER.get_task_time();
+    let syscall_times = TASK_MANAGER.get_syscall_times();
+    let status = TaskStatus::Running;
+    let ti = TASK_MANAGER.translate_useraddr(_ti as *const u8) as *mut TaskInfo;
+    unsafe {*ti = TaskInfo {
+        time,
+        syscall_times,
+        status,
+    };}
+    0
 }
 
 /// YOUR JOB: Implement mmap.
@@ -142,7 +159,10 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
         "kernel:pid[{}] sys_mmap NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    if start % 4096 != 0 {
+        return -1;
+    }
+    TASK_MANAGER.mmap(start, len, port)
 }
 
 /// YOUR JOB: Implement munmap.
@@ -151,7 +171,10 @@ pub fn sys_munmap(_start: usize, _len: usize) -> isize {
         "kernel:pid[{}] sys_munmap NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    if start % 4096 != 0 {
+        return -1;
+    }
+    TASK_MANAGER.unmmap(start, len)
 }
 
 /// change data segment size
