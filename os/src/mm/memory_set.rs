@@ -47,6 +47,70 @@ impl MemorySet {
             areas: Vec::new(),
         }
     }
+    /// malloc memory sized len from start
+    pub fn mmap(&mut self, start: usize, len: usize, port: usize) -> isize {
+        println!("-----start: {}, len: {}-----", start, len);
+        if port & 0b0000_0111 != port || port == 0{
+            return -1;
+        }
+
+        let vpnrange = VPNRange::new(
+            VirtAddr::from(start).floor(), VirtAddr::from(start+len).ceil());
+        
+        println!("####start: {}, end: {}####", VirtAddr::from(start).floor().0,VirtAddr::from(start+len).ceil().0);
+
+        for vpn in vpnrange {
+            println!("vpn: {}", vpn.0);
+            if let Some(pte) = self.page_table.translate(vpn) {
+                
+                if pte.is_valid() {
+                    println!("invalid!! vpn: {}", vpn.0);
+                    return -1;
+                }
+            } else {
+                println!("exits None??? vpn: {}", vpn.0);
+            }
+        }
+
+        let mut perm = MapPermission::U;
+
+        if(port & 0b0001) != 0 {  //is readable
+            perm |= MapPermission::R;
+        }
+        if(port & 0b0010) != 0 {  //is writable
+            perm |= MapPermission::W;
+        }
+        if(port & 0b0100) != 0 {  //is executable
+            perm |= MapPermission::X;
+        }
+
+        self.insert_framed_area(
+            VirtAddr::from(start), VirtAddr::from(start+len), perm);
+        0
+    }
+
+    /// unmalloc memory sized len from start
+    pub fn munmap(&mut self, start: usize, len: usize) -> isize {
+        let vpnrange = VPNRange::new(
+            VirtAddr::from(start).floor(), VirtAddr::from(start+len).ceil());
+        
+        for vpn in vpnrange {
+            let pte = self.page_table.translate(vpn);
+            if pte.is_none() || !pte.unwrap().is_valid() {
+                return -1;
+            }
+        }
+
+        for vpn in vpnrange {
+            for area in &mut self.areas {
+                if vpn >= area.vpn_range.get_start() && vpn < area.vpn_range.get_end(){
+                    area.unmap_one(&mut self.page_table, vpn);
+                }
+            }
+        }
+        0
+    }
+
     /// translate user address to physical address
     pub fn translate_useraddr_to_physaddr(&self, ptr: *const u8) -> usize {
         let token = self.token();

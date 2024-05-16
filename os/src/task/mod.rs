@@ -92,6 +92,20 @@ impl TaskManager {
         panic!("unreachable in run_first_task!");
     }
 
+    /// mmap
+    pub fn mmap(&self, start: usize, len: usize, port: usize) -> isize {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].memory_set.mmap(start, len, port)
+    }
+
+    /// unmmap
+    pub fn unmmap(&self, start: usize, len: usize) -> isize {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].memory_set.munmap(start, len)
+    }
+
     /// translate user address to physical address in current task
     pub fn translate_useraddr(&self, ptr: *const u8) -> usize {
         let inner = self.inner.exclusive_access();
