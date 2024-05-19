@@ -25,6 +25,19 @@ impl TaskManager {
     pub fn fetch(&mut self) -> Option<Arc<TaskControlBlock>> {
         self.ready_queue.pop_front()
     }
+
+    /// get the minimun stride one 
+    pub fn get_min_stride(&self) -> isize {
+        let mut min_stri = usize::MAX;
+        if self.ready_queue.is_empty() {
+            return -1;
+        }
+        for tcb in self.ready_queue.iter() {
+            let current_stri = tcb.inner_exclusive_access().stride;
+            if current_stri < min_stri { min_stri = current_stri; }
+        }
+        min_stri as isize
+    }
 }
 
 lazy_static! {

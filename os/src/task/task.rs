@@ -1,7 +1,7 @@
 //! Types related to task management & Functions for completely changing TCB
 use super::{current_task, TaskContext};
 use super::{kstack_alloc, pid_alloc, KernelStack, PidHandle};
-use crate::config::{MAX_SYSCALL_NUM, TRAP_CONTEXT_BASE};
+use crate::config::{BIG_STRIDE, INIT_PRI, MAX_SYSCALL_NUM, TRAP_CONTEXT_BASE};
 use crate::mm::{MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
 use crate::sync::UPSafeCell;
 use crate::trap::{trap_handler, TrapContext};
@@ -74,9 +74,30 @@ pub struct TaskControlBlockInner {
 
     /// the task syscall times
     pub syscall_times: [u32; MAX_SYSCALL_NUM],
+
+    /// priority
+    pub priority: usize,
+
+    /// current stride
+    pub stride: usize,
 }
 
 impl TaskControlBlockInner {
+    /// get the pass 
+    pub fn get_pass(&self) -> usize {
+        BIG_STRIDE / self.priority
+    }
+
+    /// set the priority
+    pub fn set_pri(&mut self, pri: isize) -> isize{
+        if pri >=2 {
+            self.priority = pri as usize;
+            pri
+        } else {
+            -1
+        }
+    }
+
     /// get the trap context
     pub fn get_trap_cx(&self) -> &'static mut TrapContext {
         self.trap_cx_ppn.get_mut()
@@ -126,6 +147,8 @@ impl TaskControlBlock {
                     program_brk: user_sp,
                     start_time: 0,
                     syscall_times: [0; MAX_SYSCALL_NUM],
+                    priority: INIT_PRI,
+                    stride: 0,
                 })
             },
         };
@@ -167,6 +190,8 @@ pub fn spwan(&self, data: &[u8]) -> Arc<TaskControlBlock> {
             program_brk: parent_inner.program_brk,
             start_time: parent_inner.start_time,
             syscall_times: parent_inner.syscall_times,
+            priority: INIT_PRI,
+            stride: 0,
         })
     };
     drop(parent_inner);
@@ -251,6 +276,8 @@ pub fn spwan(&self, data: &[u8]) -> Arc<TaskControlBlock> {
                     program_brk: parent_inner.program_brk,
                     start_time: 0,
                     syscall_times:  [0; MAX_SYSCALL_NUM],
+                    priority: INIT_PRI,
+                    stride: 0,
                 })
             },
         });

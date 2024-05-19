@@ -132,6 +132,45 @@ lazy_static! {
 ///Loop `fetch_task` to get the process that needs to run, and switch the process through `__switch`
 pub fn run_tasks() {
     loop {
+        // println!("trap into run_tasks!");
+        // let mut processor = PROCESSOR.exclusive_access();
+        // println!("!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        // let _min_stri = TASK_MANAGER.exclusive_access().get_min_stride();
+        // if let Some(task) = fetch_task() {
+        //     println!("before compare");
+        //     // if min_stri == -1 || task.inner_exclusive_access().priority == min_stri as usize{
+        //     if true {
+        //         println!("after compare");
+        //         let idle_task_cx_ptr = processor.get_idle_task_cx_ptr();
+        //         // access coming task TCB exclusively
+        //         let mut task_inner = task.inner_exclusive_access();
+        //         let next_task_cx_ptr = &task_inner.task_cx as *const TaskContext;
+        //         task_inner.task_status = TaskStatus::Running;
+        //         let time_ms_now = get_time_ms();
+        //         if let Some(current) = processor.current() {
+        //             let mut inner = current.inner_exclusive_access();
+        //             if inner.start_time == 0 {
+        //                 inner.start_time = time_ms_now;
+        //             }
+    
+        //         }
+
+        //         task_inner.stride += task_inner.get_pass();
+    
+        //         // release coming task_inner manually
+        //         drop(task_inner);
+        //         // release coming task TCB manually
+        //         processor.current = Some(task);
+        //         // release processor manually
+        //         drop(processor);
+        //         unsafe {
+        //             __switch(idle_task_cx_ptr, next_task_cx_ptr);
+        //         }
+        //     }
+        // }
+        // // } else {
+        // //     warn!("no tasks available in run_tasks");
+        // // }
         let mut processor = PROCESSOR.exclusive_access();
         if let Some(task) = fetch_task() {
             let idle_task_cx_ptr = processor.get_idle_task_cx_ptr();
@@ -139,16 +178,6 @@ pub fn run_tasks() {
             let mut task_inner = task.inner_exclusive_access();
             let next_task_cx_ptr = &task_inner.task_cx as *const TaskContext;
             task_inner.task_status = TaskStatus::Running;
-            let time_ms_now = get_time_ms();
-            if let Some(current) = processor.current() {
-                let mut inner = current.inner_exclusive_access();
-                if inner.start_time == 0 {
-                    inner.start_time = time_ms_now;
-                }
-
-            }
-
-            // release coming task_inner manually
             drop(task_inner);
             // release coming task TCB manually
             processor.current = Some(task);
@@ -157,8 +186,6 @@ pub fn run_tasks() {
             unsafe {
                 __switch(idle_task_cx_ptr, next_task_cx_ptr);
             }
-        } else {
-            warn!("no tasks available in run_tasks");
         }
     }
 }
