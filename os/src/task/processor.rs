@@ -4,10 +4,13 @@
 //! the current running state of CPU is recorded,
 //! and the replacement and transfer of control flow of different applications are executed.
 
+
 use super::__switch;
 use super::{fetch_task, TaskStatus};
 use super::{TaskContext, TaskControlBlock};
+use crate::config::MAX_SYSCALL_NUM;
 use crate::sync::UPSafeCell;
+use crate::timer::get_time_ms;
 use crate::trap::TrapContext;
 use alloc::sync::Arc;
 use lazy_static::*;
@@ -44,6 +47,81 @@ impl Processor {
     pub fn current(&self) -> Option<Arc<TaskControlBlock>> {
         self.current.as_ref().map(Arc::clone)
     }
+
+
+    /// mmap
+    pub fn mmap(&self, start: usize, len: usize, port: usize) -> isize {
+        let current = self.current().unwrap();
+        let mut inner = current.inner_exclusive_access();
+        inner.memory_set.mmap(start, len, port)
+    }
+
+    /// unmmap
+    pub fn unmmap(&self, start: usize, len: usize) -> isize {
+        let current = self.current().unwrap();
+        let mut inner = current.inner_exclusive_access();
+        inner.memory_set.munmap(start, len)
+    }
+
+    /// translate user address to physical address in current task
+    pub fn translate_useraddr(&self, ptr: *const u8) -> usize {
+        let current = self.current().unwrap();
+        let inner = current.inner_exclusive_access();
+        inner.memory_set.translate_useraddr_to_physaddr(ptr)
+    }
+
+    /// get the time interval since the task was first invoked
+    pub fn get_task_time(&self) -> usize { 
+        let current = self.current().unwrap();
+        let inner = current.inner_exclusive_access();
+        let time = inner.start_time;
+        //drop(inner);
+        get_time_ms() - time
+    }
+
+    /// get the task of syscall times
+    pub fn get_syscall_times(&self) -> [u32; MAX_SYSCALL_NUM] {
+        let current = self.current().unwrap();
+        let inner = current.inner_exclusive_access();
+        inner.syscall_times
+    }
+
+    /// increase the syscall time of current task
+    pub fn increase_syscall_time(&self, id: usize) {
+        let current = self.current().unwrap();
+        let mut inner = current.inner_exclusive_access();
+        inner.syscall_times[id] += 1;
+    }
+}
+
+/// increase the syscall time of current task
+pub fn increase_syscall_time(id: usize) {
+    PROCESSOR.exclusive_access().increase_syscall_time(id)
+}
+
+/// get the task of syscall times
+pub fn get_syscall_times() -> [u32; MAX_SYSCALL_NUM] {
+PROCESSOR.exclusive_access().get_syscall_times()
+}
+
+/// get the time interval since the task was first invoked
+pub fn get_task_time() -> usize {
+    PROCESSOR.exclusive_access().get_task_time()
+}
+
+ /// translate user address to physical address in current task
+ pub fn translate_useraddr(ptr: *const u8) -> usize {
+    PROCESSOR.exclusive_access().translate_useraddr(ptr)
+ }
+
+/// unmmap
+pub fn unmmap(start: usize, len: usize) -> isize {
+    PROCESSOR.exclusive_access().unmmap(start, len)
+}
+
+/// mmap
+pub fn mmap(start: usize, len: usize, port: usize) -> isize {
+    PROCESSOR.exclusive_access().mmap(start, len, port)
 }
 
 lazy_static! {
@@ -61,6 +139,15 @@ pub fn run_tasks() {
             let mut task_inner = task.inner_exclusive_access();
             let next_task_cx_ptr = &task_inner.task_cx as *const TaskContext;
             task_inner.task_status = TaskStatus::Running;
+            let time_ms_now = get_time_ms();
+            if let Some(current) = processor.current() {
+                let mut inner = current.inner_exclusive_access();
+                if inner.start_time == 0 {
+                    inner.start_time = time_ms_now;
+                }
+
+            }
+
             // release coming task_inner manually
             drop(task_inner);
             // release coming task TCB manually
